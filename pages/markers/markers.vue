@@ -79,7 +79,7 @@
         <view 
           v-if="!isManageMode"
           class="delete-btn"
-          @tap="deleteMarker(marker)"
+          @tap="deleteMarker"
         >删除</view>
       </view>
 
@@ -106,6 +106,21 @@
       </view>
     </view>
 
+    
+
+    <!-- 编辑标记弹窗 -->
+    <uni-popup ref="editPopup" type="bottom">
+      <marker-edit-content
+        v-model="editingMarker"
+        title="编辑标记"
+        confirm-text="保存"
+        :show-delete="true"
+        @confirm="confirmEdit"
+        @cancel="cancelEdit"
+        @delete="deleteMarker"
+      />
+    </uni-popup>
+
     <!-- 删除确认弹窗 -->
     <uni-popup ref="deleteConfirmPopup" type="dialog">
       <uni-popup-dialog
@@ -124,6 +139,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useStore } from 'vuex'
+import MarkerEditContent from '@/components/marker-edit-content.vue'
 
 const store = useStore()
 const deleteConfirmPopup = ref(null)
@@ -174,10 +190,16 @@ const toggleSortOrder = () => {
 
 // 显示标记详情
 const showMarkerDetail = (marker) => {
-  store.commit('SET_SELECTED_MARKER', marker.id)
-  uni.navigateTo({
-    url: `/pages/marker/detail?id=${marker.id}`
-  })
+  editingMarker.value = {
+    id: marker.id,
+    title: marker.title,
+    description: marker.description,
+    location: marker.location,
+    tags: marker.tags || [],
+    createTime: marker.createTime,
+    updateTime: marker.updateTime
+  }
+  editPopup.value.open()
 }
 
 // 格式化时间
@@ -256,8 +278,8 @@ const touchEnd = (e) => {
 }
 
 // 删除标记
-const deleteMarker = (marker) => {
-  markerToDelete.value = marker
+const deleteMarker = () => {
+  markerToDelete.value = editingMarker.value
   deleteConfirmPopup.value.open()
 }
 
@@ -272,7 +294,11 @@ const confirmDelete = async () => {
       selectedMarkers.value = []
     } else {
       // 单个删除
+      if (!markerToDelete.value || !markerToDelete.value.id) {
+        throw new Error('Invalid marker to delete')
+      }
       await store.dispatch('deleteMarker', markerToDelete.value.id)
+      editPopup.value.close()
     }
     
     deleteConfirmPopup.value.close()
@@ -286,6 +312,8 @@ const confirmDelete = async () => {
       title: '删除失败',
       icon: 'error'
     })
+  } finally {
+    markerToDelete.value = null
   }
 }
 
@@ -334,6 +362,54 @@ const toggleSelectAll = () => {
 const batchDelete = () => {
   if (!selectedMarkers.value.length) return
   deleteConfirmPopup.value.open()
+}
+
+// 编辑相关的数据和方法
+const editPopup = ref(null)
+const editingMarker = ref({
+  id: '',
+  title: '',
+  description: '',
+  location: null,
+  tags: [],
+  createTime: 0,
+  updateTime: 0
+})
+
+// 确认编辑
+const confirmEdit = async () => {
+  try {
+    await store.dispatch('updateMarker', {
+      ...editingMarker.value,
+      updateTime: Date.now()
+    })
+    
+    editPopup.value.close()
+    uni.showToast({
+      title: '更新成功',
+      icon: 'success'
+    })
+  } catch (error) {
+    console.error('更新标记失败:', error)
+    uni.showToast({
+      title: '更新失败',
+      icon: 'error'
+    })
+  }
+}
+
+// 取消编辑
+const cancelEdit = () => {
+  editPopup.value.close()
+  editingMarker.value = {
+    id: '',
+    title: '',
+    description: '',
+    location: null,
+    tags: [],
+    createTime: 0,
+    updateTime: 0
+  }
 }
 </script>
 
@@ -606,5 +682,14 @@ const batchDelete = () => {
   text-align: center;
   color: #999;
   font-size: 14px;
+}
+
+// 调整弹窗层级
+:deep(.uni-popup) {
+  z-index: 99;
+  
+  &.uni-popup-dialog {
+    z-index: 999 !important;
+  }
 }
 </style> 

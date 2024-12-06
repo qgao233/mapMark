@@ -61,56 +61,26 @@
 
     <!-- 创建标记弹窗 -->
     <uni-popup ref="createPopup" type="bottom">
-      <view class="popup-content">
-        <text class="popup-title">创建新标记</text>
-        <input
-          v-model="newMarker.title"
-          class="input"
-          placeholder="标记标题"
-          maxlength="50"
-          @input="onTitleInput"
-        />
-        <textarea
-          v-model="newMarker.description"
-          class="textarea"
-          placeholder="详细描述"
-          maxlength="200"
-        />
-        <view class="btn-group">
-          <text @click="cancelCreate" class="btn cancel-text">取消</text>
-          <text 
-            @click="confirmCreate" 
-            :class="['btn', 'confirm-text', !newMarker.title && 'disabled']"
-          >确定</text>
-        </view>
-      </view>
+      <marker-edit-content
+        v-model="newMarker"
+        title="创建新标记"
+        confirm-text="确定"
+        @confirm="confirmCreate"
+        @cancel="cancelCreate"
+      />
     </uni-popup>
 
     <!-- 编辑标记弹窗 -->
     <uni-popup ref="editPopup" type="bottom">
-      <view class="popup-content">
-        <text class="popup-title">编辑标记</text>
-        <input
-          v-model="editingMarker.title"
-          class="input"
-          placeholder="标记标题"
-          maxlength="50"
-        />
-        <textarea
-          v-model="editingMarker.description"
-          class="textarea"
-          placeholder="详细描述"
-          maxlength="200"
-        />
-        <view class="btn-group">
-          <text @click="deleteMarker" class="btn delete-text">删除</text>
-          <text @click="cancelEdit" class="btn cancel-text">取消</text>
-          <text 
-            @click="confirmEdit" 
-            :class="['btn', 'confirm-text', !editingMarker.title && 'disabled']"
-          >保存</text>
-        </view>
-      </view>
+      <marker-edit-content
+        v-model="editingMarker"
+        title="编辑标记"
+        confirm-text="保存"
+        :show-delete="true"
+        @confirm="confirmEdit"
+        @cancel="cancelEdit"
+        @delete="deleteMarker"
+      />
     </uni-popup>
 
     <!-- 删除确认弹窗 -->
@@ -131,8 +101,12 @@
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useStore } from 'vuex'
+import MarkerEditContent from '@/components/marker-edit-content.vue'
 
 export default {
+  components: {
+    MarkerEditContent
+  },
   setup() {
     // store
     const store = useStore()
@@ -152,7 +126,10 @@ export default {
     const newMarker = ref({
       title: '',
       description: '',
-      location: null
+      location: null,
+      tags: [],
+      createTime: 0,
+      updateTime: 0
     })
 
     // 编辑中的标记数据
@@ -160,7 +137,10 @@ export default {
       id: '',
       title: '',
       description: '',
-      location: null
+      location: null,
+      tags: [],
+      createTime: 0,
+      updateTime: 0
     })
 
     // 处理后的标记点数据
@@ -222,14 +202,21 @@ export default {
 
     const onMarkerTap = (e) => {
       if (isCreatingMode.value) return
-      console.log(233)
+      
       const markerId = e.detail.markerId
-      const marker = store.state.markers.items.find(m => m.id == markerId)
-      console.log(e,store.state.markers.items)
+      const marker = store.state.markers.items.find(m => m.id === markerId)
       
       if (!marker) return
 
-      editingMarker.value = { ...marker }
+      editingMarker.value = {
+        id: marker.id,
+        title: marker.title,
+        description: marker.description,
+        location: marker.location,
+        tags: marker.tags || [],
+        createTime: marker.createTime,
+        updateTime: marker.updateTime
+      }
       editPopup.value.open()
     }
 
@@ -673,6 +660,15 @@ export default {
 .search-container-hidden {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+// 调整弹窗层级
+:deep(.uni-popup) {
+  z-index: 99;
+  
+  &.uni-popup-dialog {
+    z-index: 999 !important;
+  }
 }
 
 </style> 
