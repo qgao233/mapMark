@@ -1,0 +1,36 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/markers/markers"
+  ],
+  "tabBar": {
+    "backgroundColor": "#FFFFFF",
+    "color": "#999999",
+    "selectedColor": "#007AFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "地图",
+        "iconPath": "static/images/tabbar/map.png",
+        "selectedIconPath": "static/images/tabbar/map.png"
+      },
+      {
+        "pagePath": "pages/markers/markers",
+        "text": "列表",
+        "iconPath": "static/images/tabbar/list.png",
+        "selectedIconPath": "static/images/tabbar/list.png"
+      }
+    ]
+  },
+  "requiredPrivateInfos": [
+    "getLocation",
+    "chooseLocation"
+  ],
+  "permission": {
+    "scope.userLocation": {
+      "desc": "你的位置信息将用于在地图上显示"
+    }
+  },
+  "usingComponents": {}
+}

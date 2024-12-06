@@ -1,0 +1,45 @@
+{
+	"pages": [
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationStyle": "custom",
+				"app-plus": {
+					"titleNView": false
+				}
+			}
+		},
+		{
+			"path": "pages/markers/markers",
+			"style": {
+				"navigationStyle": "custom",
+				"app-plus": {
+					"titleNView": false
+				}
+			}
+		}
+	],
+	"tabBar": {
+		"height": "50px",
+		"backgroundColor": "#FFFFFF",
+		"color": "#999999",
+		"selectedColor": "#007AFF",
+		"borderStyle": "black",
+		"fontSize": "14px",
+		"spacing": "5px",
+		"list": [
+			{
+				"pagePath": "pages/index/index",
+				"text": "地图",
+				"iconPath": "static/images/tabbar/map.png",
+				"selectedIconPath": "static/images/tabbar/map.png"
+			},
+			{
+				"pagePath": "pages/markers/markers",
+				"text": "列表",
+				"iconPath": "static/images/tabbar/list.png",
+				"selectedIconPath": "static/images/tabbar/list.png"
+			}
+		]
+	}
+}

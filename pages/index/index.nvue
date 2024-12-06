@@ -1,0 +1,678 @@
+<template>
+  <view class="container">
+    <!-- 搜索框 -->
+    <cover-view 
+      class="search-container"
+      :class="{ 'search-container-hidden': isSearchPopupOpen }"
+      v-if="!isSearchBoxHidden"
+      @click="openLocationChooser"
+    >
+        <cover-image 
+          class="search-icon" 
+          src="/static/images/search.png"
+        ></cover-image>
+        <cover-view class="search-placeholder">搜索地点</cover-view>
+    </cover-view>
+
+    <!-- 地图组件 -->
+    <map
+      class="map"
+      :latitude="mapState.center.latitude"
+      :longitude="mapState.center.longitude"
+      :markers="displayMarkers"
+      :scale="mapState.zoom"
+      show-location="false"
+      @markertap="onMarkerTap"
+      @callouttap="onMarkerTap"
+      @tap="onMapTap"
+      :enable-3D="true"
+      :show-compass="true"
+      :enable-rotate="true"
+    ></map>
+
+    <!-- 定位按钮 -->
+    <cover-view 
+      class="float-btn location-btn"
+      @click="moveToCurrentLocation"
+    >
+      <cover-image 
+        class="btn-icon" 
+        src="/static/images/location.png"
+      ></cover-image>
+    </cover-view>
+
+    <!-- 创建模式指示器 -->
+    <cover-view v-if="isCreatingMode" class="creating-indicator">
+      <text class="indicator-text">点击地图选择标记位置</text>
+      <text class="cancel-btn" @click="cancelCreating">取消</text>
+    </cover-view>
+
+    <!-- 添加按钮 -->
+    <cover-view 
+      v-if="!isCreatingMode"
+      class="float-btn add-btn"
+      @click="startCreating"
+    >
+      <cover-image 
+        class="btn-icon" 
+        src="/static/images/add.png"
+      ></cover-image>
+    </cover-view>
+
+    <!-- 创建标记弹窗 -->
+    <uni-popup ref="createPopup" type="bottom">
+      <view class="popup-content">
+        <text class="popup-title">创建新标记</text>
+        <input
+          v-model="newMarker.title"
+          class="input"
+          placeholder="标记标题"
+          maxlength="50"
+          @input="onTitleInput"
+        />
+        <textarea
+          v-model="newMarker.description"
+          class="textarea"
+          placeholder="详细描述"
+          maxlength="200"
+        />
+        <view class="btn-group">
+          <text @click="cancelCreate" class="btn cancel-text">取消</text>
+          <text 
+            @click="confirmCreate" 
+            :class="['btn', 'confirm-text', !newMarker.title && 'disabled']"
+          >确定</text>
+        </view>
+      </view>
+    </uni-popup>
+
+    <!-- 编辑标记弹窗 -->
+    <uni-popup ref="editPopup" type="bottom">
+      <view class="popup-content">
+        <text class="popup-title">编辑标记</text>
+        <input
+          v-model="editingMarker.title"
+          class="input"
+          placeholder="标记标题"
+          maxlength="50"
+        />
+        <textarea
+          v-model="editingMarker.description"
+          class="textarea"
+          placeholder="详细描述"
+          maxlength="200"
+        />
+        <view class="btn-group">
+          <text @click="deleteMarker" class="btn delete-text">删除</text>
+          <text @click="cancelEdit" class="btn cancel-text">取消</text>
+          <text 
+            @click="confirmEdit" 
+            :class="['btn', 'confirm-text', !editingMarker.title && 'disabled']"
+          >保存</text>
+        </view>
+      </view>
+    </uni-popup>
+
+    <!-- 删除确认弹窗 -->
+    <uni-popup ref="deleteConfirmPopup" type="dialog">
+      <uni-popup-dialog
+        type="warning"
+        title="删除标记"
+        content="确定要删除这个标记吗？此操作不可撤销。"
+        :duration="2000"
+        :before-close="true"
+        @confirm="confirmDelete"
+        @close="cancelDelete"
+      ></uni-popup-dialog>
+    </uni-popup>
+  </view>
+</template>
+
+<script>
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useStore } from 'vuex'
+
+export default {
+  setup() {
+    // store
+    const store = useStore()
+
+    // refs
+    const createPopup = ref(null)
+    const editPopup = ref(null)
+    const deleteConfirmPopup = ref(null)
+
+    // 创建模式状态
+    const isCreatingMode = ref(false)
+
+    // 地图状态
+    const mapState = computed(() => store.state.map)
+
+    // 新标记数据
+    const newMarker = ref({
+      title: '',
+      description: '',
+      location: null
+    })
+
+    // 编辑中的标记数据
+    const editingMarker = ref({
+      id: '',
+      title: '',
+      description: '',
+      location: null
+    })
+
+    // 处理后的标记点数据
+    const displayMarkers = computed(() => {
+      return store.state.markers.items.map(marker => ({
+        id: marker.id,
+        latitude: marker.location.latitude,
+        longitude: marker.location.longitude,
+        title: marker.title,
+        iconPath: '/static/images/marker.png',
+        width: 32,
+        height: 32,
+        callout: {
+          content: marker.title,
+          color: '#000000',
+          fontSize: 14,
+          borderRadius: 4,
+          padding: 8,
+          display: 'ALWAYS',
+          bgColor: '#ffffff'
+        }
+      }))
+    })
+
+
+    // 地图是否正在被用户操作
+    const isMapMoving = ref(false)
+    
+    // 是否跟随定位
+    const isFollowingLocation = ref(true)
+
+    // 移除原有的搜索相关状态和方法
+    const isSearchPopupOpen = ref(false)
+    const isSearchBoxHidden = ref(false)
+
+    // 方法定义...
+    const startCreating = () => {
+      isCreatingMode.value = true
+    }
+
+    const cancelCreating = () => {
+      isCreatingMode.value = false
+    }
+
+    const onMapTap = (e) => {
+      if (!isCreatingMode.value) return
+      
+      newMarker.value = {
+        title: '',
+        description: '',
+        location: {
+          latitude: e.detail.latitude,
+          longitude: e.detail.longitude
+        }
+      }
+      isCreatingMode.value = false
+      createPopup.value.open()
+    }
+
+    const onMarkerTap = (e) => {
+      if (isCreatingMode.value) return
+      console.log(233)
+      const markerId = e.detail.markerId
+      const marker = store.state.markers.items.find(m => m.id == markerId)
+      console.log(e,store.state.markers.items)
+      
+      if (!marker) return
+
+      editingMarker.value = { ...marker }
+      editPopup.value.open()
+    }
+
+    const cancelCreate = () => {
+      createPopup.value.close()
+      newMarker.value = {
+        title: '',
+        description: '',
+        location: null
+      }
+    }
+
+    const confirmCreate = async () => {
+      if (!newMarker.value.title) {
+        uni.showToast({
+          title: '请输入标题',
+          icon: 'none'
+        })
+        return
+      }
+
+      try {
+        await store.dispatch('createMarker', {
+          ...newMarker.value,
+          createTime: Date.now(),
+          updateTime: Date.now()
+        })
+        
+        createPopup.value.close()
+        newMarker.value = {
+          title: '',
+          description: '',
+          location: null
+        }
+        
+        uni.showToast({
+          title: '创建成功',
+          icon: 'success'
+        })
+      } catch (error) {
+        console.error('创建标记失败:', error)
+        uni.showToast({
+          title: '创建失败',
+          icon: 'error'
+        })
+      }
+    }
+
+    const onTitleInput = (e) => {
+      newMarker.value.title = e.detail.value.trim()
+    }
+
+    // 获取当前位置
+    const getCurrentLocation = () => {
+      return new Promise((resolve, reject) => {
+        uni.getLocation({
+          type: 'gcj02',
+          isHighAccuracy: true,
+          success: res => {
+            console.log('当前位置:', res)
+            resolve({
+              latitude: res.latitude,
+              longitude: res.longitude
+            })
+          },
+          fail: err => {
+            console.error('获取位置失败:', err)
+            resolve({
+              latitude: 39.909,
+              longitude: 116.397
+            })
+          }
+        })
+      })
+    }
+
+    // 移动到当前位置并更新标记
+    const moveToCurrentLocation = async () => {
+      try {
+        // 显示加载提示
+        uni.showLoading({
+          title: '定位中...',
+          mask: true
+        })
+
+        // 获取当前位置
+        const location = await getCurrentLocation()
+        
+        
+        // 更新地图中心点
+        store.commit('SET_MAP_CENTER', location)
+
+        uni.hideLoading()
+      } catch (error) {
+        console.error('定位失败:', error)
+        uni.showToast({
+          title: '定位失败',
+          icon: 'error'
+        })
+      }
+    }
+
+    // 取消编辑
+    const cancelEdit = () => {
+      editPopup.value.close()
+      editingMarker.value = {
+        id: '',
+        title: '',
+        description: '',
+        location: null
+      }
+    }
+
+    // 确认编辑
+    const confirmEdit = async () => {
+      if (!editingMarker.value.title) {
+        uni.showToast({
+          title: '请输入标题',
+          icon: 'none'
+        })
+        return
+      }
+
+      try {
+        await store.dispatch('updateMarker', {
+          ...editingMarker.value,
+          updateTime: Date.now()
+        })
+        
+        editPopup.value.close()
+        uni.showToast({
+          title: '更新成功',
+          icon: 'success'
+        })
+      } catch (error) {
+        console.error('更新标记失败:', error)
+        uni.showToast({
+          title: '更新失败',
+          icon: 'error'
+        })
+      }
+    }
+
+    // 删除标记
+    const deleteMarker = () => {
+      deleteConfirmPopup.value.open()
+    }
+
+    // 确认删除
+    const confirmDelete = async () => {
+      try {
+        await store.dispatch('deleteMarker', editingMarker.value.id)
+        deleteConfirmPopup.value.close()
+        editPopup.value.close()
+        uni.showToast({
+          title: '删除成功',
+          icon: 'success'
+        })
+      } catch (error) {
+        console.error('删除标记失败:', error)
+        uni.showToast({
+          title: '删除失败',
+          icon: 'error'
+        })
+      }
+    }
+
+    // 取消删除
+    const cancelDelete = () => {
+      deleteConfirmPopup.value.close()
+    }
+
+    // 打开地点选择器
+    const openLocationChooser = async () => {
+      try {
+        const location = await uni.chooseLocation()
+        console.log('选择的位置:', location)
+        
+        // 更新地图中心点
+        store.commit('SET_MAP_CENTER', {
+          latitude: location.latitude,
+          longitude: location.longitude
+        })
+
+        // 如果在创建模式下，自动填充位置并打开创建弹窗
+        if (isCreatingMode.value) {
+          newMarker.value = {
+            title: location.name || '',
+            description: location.address || '',
+            location: {
+              latitude: location.latitude,
+              longitude: location.longitude
+            }
+          }
+          createPopup.value.open()
+          isCreatingMode.value = false
+        }
+      } catch (error) {
+        console.log('取消选择位置或发生错误:', error)
+      }
+    }
+
+    // 初始化
+    onMounted(() => {
+      // 初始化时获取一次位置
+      moveToCurrentLocation()
+    })
+
+    // 移除定时器相关代码
+    onBeforeUnmount(() => {
+      // 清理代码...
+    })
+
+    return {
+      createPopup,
+      isCreatingMode,
+      mapState,
+      newMarker,
+      displayMarkers,
+      startCreating,
+      cancelCreating,
+      onMapTap,
+      onMarkerTap,
+      cancelCreate,
+      confirmCreate,
+      onTitleInput,
+      moveToCurrentLocation,
+      editPopup,
+      deleteConfirmPopup,
+      editingMarker,
+      cancelEdit,
+      confirmEdit,
+      deleteMarker,
+      confirmDelete,
+      cancelDelete,
+      openLocationChooser,
+      isSearchPopupOpen,
+      isSearchBoxHidden
+    }
+  }
+}
+</script>
+
+<style lang="scss">
+.container {
+  flex: 1;
+  position: relative;
+  flex-direction: column;
+}
+
+.map {
+  width: 100vw;//不允许动
+  height: 100vh;//不允许动
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+// 创建模式指示器
+.creating-indicator {
+  position: fixed;
+  top: 100px; // 调整位置，避免异形屏遮挡
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.75);
+  border-radius: 30px;
+  padding: 12px 20px;
+  flex-direction: row;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  .indicator-text {
+    color: #ffffff;
+    font-size: 15px;
+    margin-right: 12px;
+    font-weight: 500;
+  }
+
+  .cancel-btn {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-size: 13px;
+  }
+}
+
+// 浮动按钮基础样式
+.float-btn {
+  position: fixed;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  
+  &:active {
+    transform: scale(0.95);
+    background-color: rgba(255, 255, 255, 0.95);
+  }
+
+  .btn-icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+// 定位按钮位置
+.location-btn {
+  bottom: 130px;
+}
+
+// 添加按钮位置
+.add-btn {
+  bottom: 70px;
+}
+
+// 弹窗样式优化
+.popup-content {
+  background-color: #ffffff;
+  padding: 24px 20px;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+
+  // #ifdef MP-WEIXIN
+   margin-bottom: -34px;//不允许动
+    // #endif
+
+  .popup-title {
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 24px;
+    color: #333;
+  }
+
+  .input,
+  .textarea {
+    width: 100%;
+    border-width: 1px;
+    border-color: #e5e5e5;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-size: 15px;
+    background-color: #f8f8f8;
+    box-sizing: border-box;
+  }
+
+  .input {
+    height: 44px; // 增加输入框高度
+  }
+
+  .textarea {
+    height: 120px;
+  }
+
+  .btn-group {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 8px;
+
+    .btn {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      margin: 0 6px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+
+      &.cancel-text {
+        color: #666666;
+        background-color: #f5f5f5;
+      }
+
+      &.confirm-text {
+        background-color: #007AFF;
+        color: #ffffff;
+
+        &.disabled {
+          background-color: rgba(0, 122, 255, 0.5);
+        }
+      }
+
+      .delete-text {
+        flex: 0.8;
+        background-color: #ff3b30;
+        color: #ffffff;
+      }
+    }
+  }
+}
+
+// 搜索框样式
+.search-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin: 44px 100px 12px 16px;
+  border-radius: 30px;
+
+  background: linear-gradient(to bottom, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.8) 100%);
+  transition-property: opacity, transform;
+  transition-duration: 0.3s;
+  opacity: 1;
+  transform: translateY(0);
+
+  display: flex;//不要动
+  flex-direction: row;
+  align-items: center;
+  background-color: #f5f5f5;
+  height: 44px;
+  line-height: 44px;
+
+  .search-icon {
+    width: 16px;
+    height: 16px;
+    margin: 0 8px;
+  }
+
+  .search-input,
+  .search-placeholder {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+
+  }
+
+  .search-placeholder {
+    color: #999;
+  }
+}
+
+.search-container-hidden {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+</style> 
