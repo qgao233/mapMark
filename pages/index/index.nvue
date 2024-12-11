@@ -43,8 +43,8 @@
 
     <!-- 创建模式指示器 -->
     <cover-view v-if="isCreatingMode" class="creating-indicator">
-      <text class="indicator-text">点击地图选择标记位置</text>
-      <text class="cancel-btn" @click="cancelCreating">取消</text>
+      <cover-view class="indicator-text">点击地图选择标记位置</cover-view>
+      <cover-view class="cancel-btn" @click="cancelCreating">取消</cover-view>
     </cover-view>
 
     <!-- 添加按钮 -->
@@ -484,6 +484,7 @@ export default {
   background-color: rgba(0, 0, 0, 0.75);
   border-radius: 30px;
   padding: 12px 20px;
+  display: flex;
   flex-direction: row;
   align-items: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);

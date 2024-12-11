@@ -417,6 +417,8 @@ const cancelEdit = () => {
 .markers-container {
   height: 100vh;
   background: #f8f8f8;
+  display: flex;
+  flex-direction: column;
   // padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -488,7 +490,9 @@ const cancelEdit = () => {
 }
 
 .markers-list {
-  height: calc(100vh - 110px);
+  //height: calc(100vh - 110px);
+  height: 0;
+  flex:1;
   padding: 8px 0;
   display: flex;
   flex-direction: column;
@@ -628,6 +632,7 @@ const cancelEdit = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  z-index: 999;
 
   .select-all {
     display: flex;
