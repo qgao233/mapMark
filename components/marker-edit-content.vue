@@ -6,7 +6,7 @@
     <input
       v-model="markerData.title"
       class="input"
-      placeholder="标记标题1"
+      placeholder="标记标题"
       maxlength="50"
     />
     <textarea

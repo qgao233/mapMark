@@ -34,6 +34,7 @@
     <cover-view 
       class="float-btn location-btn"
       @click="moveToCurrentLocation"
+      v-if="!isAnyPopupOpen"
     >
       <cover-image 
         class="btn-icon" 
@@ -49,7 +50,7 @@
 
     <!-- 添加按钮 -->
     <cover-view 
-      v-if="!isCreatingMode"
+      v-if="!isCreatingMode && !isAnyPopupOpen"
       class="float-btn add-btn"
       @click="startCreating"
     >
@@ -115,6 +116,11 @@ export default {
     const createPopup = ref(null)
     const editPopup = ref(null)
     const deleteConfirmPopup = ref(null)
+    
+    // 弹窗状态
+    const isCreatePopupOpen = ref(false)
+    const isEditPopupOpen = ref(false)
+    const isDeletePopupOpen = ref(false)
 
     // 创建模式状态
     const isCreatingMode = ref(false)
@@ -165,6 +171,12 @@ export default {
       }))
     })
 
+    // 是否有任何弹窗打开
+    const isAnyPopupOpen = computed(() => {
+      return isCreatePopupOpen.value || 
+             isEditPopupOpen.value || 
+             isDeletePopupOpen.value
+    })
 
     // 地图是否正在被用户操作
     const isMapMoving = ref(false)
@@ -198,6 +210,7 @@ export default {
       }
       isCreatingMode.value = false
       createPopup.value.open()
+      isCreatePopupOpen.value = true
     }
 
     const onMarkerTap = (e) => {
@@ -218,10 +231,12 @@ export default {
         updateTime: marker.updateTime
       }
       editPopup.value.open()
+      isEditPopupOpen.value = true
     }
 
     const cancelCreate = () => {
       createPopup.value.close()
+      isCreatePopupOpen.value = false
       newMarker.value = {
         title: '',
         description: '',
@@ -246,6 +261,7 @@ export default {
         })
         
         createPopup.value.close()
+        isCreatePopupOpen.value = false
         newMarker.value = {
           title: '',
           description: '',
@@ -322,6 +338,7 @@ export default {
     // 取消编辑
     const cancelEdit = () => {
       editPopup.value.close()
+      isEditPopupOpen.value = false
       editingMarker.value = {
         id: '',
         title: '',
@@ -347,6 +364,7 @@ export default {
         })
         
         editPopup.value.close()
+        isEditPopupOpen.value = false
         uni.showToast({
           title: '更新成功',
           icon: 'success'
@@ -363,6 +381,7 @@ export default {
     // 删除标记
     const deleteMarker = () => {
       deleteConfirmPopup.value.open()
+      isDeletePopupOpen.value = true
     }
 
     // 确认删除
@@ -370,7 +389,9 @@ export default {
       try {
         await store.dispatch('deleteMarker', editingMarker.value.id)
         deleteConfirmPopup.value.close()
+        isDeletePopupOpen.value = false
         editPopup.value.close()
+        isEditPopupOpen.value = false
         uni.showToast({
           title: '删除成功',
           icon: 'success'
@@ -387,6 +408,7 @@ export default {
     // 取消删除
     const cancelDelete = () => {
       deleteConfirmPopup.value.close()
+      isDeletePopupOpen.value = false
     }
 
     // 打开地点选择器
@@ -412,6 +434,7 @@ export default {
             }
           }
           createPopup.value.open()
+          isCreatePopupOpen.value = true
           isCreatingMode.value = false
         }
       } catch (error) {
@@ -454,7 +477,8 @@ export default {
       cancelDelete,
       openLocationChooser,
       isSearchPopupOpen,
-      isSearchBoxHidden
+      isSearchBoxHidden,
+      isAnyPopupOpen
     }
   }
 }
@@ -672,4 +696,4 @@ export default {
   }
 }
 
-</style> 
+</style>
