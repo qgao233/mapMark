@@ -1,9 +1,15 @@
 <template>
   <view class="markers-container">
+    <!-- 添加状态栏渐变遮罩 -->
+    <view class="status-bar-mask"></view>
+    
     <!-- 搜索栏 -->
     <view class="search-bar">
       <view class="search-box">
-        <image class="search-icon" src="/static/images/search.png"></image>
+        <image 
+          class="search-icon" 
+          :src="staticImages.search"
+        ></image>
         <input 
           v-model="searchKeyword"
           class="search-input"
@@ -411,6 +417,11 @@ const cancelEdit = () => {
     updateTime: 0
   }
 }
+
+// 添加静态资源路径配置
+const staticImages = {
+  search: '/static/images/search.png'
+}
 </script>
 
 <style lang="scss">
@@ -696,5 +707,16 @@ const cancelEdit = () => {
   &.uni-popup-dialog {
     z-index: 999 !important;
   }
+}
+
+.status-bar-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, #fff 100%);
+  z-index: 99;
+  pointer-events: none;
 }
 </style> 

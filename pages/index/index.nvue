@@ -1,5 +1,8 @@
 <template>
   <view class="container">
+    <!-- 添加状态栏渐变遮罩 -->
+    <cover-view class="status-bar-mask"></cover-view>
+    
     <!-- 搜索框 -->
     <cover-view 
       class="search-container"
@@ -9,13 +12,14 @@
     >
         <cover-image 
           class="search-icon" 
-          src="/static/images/search.png"
+          :src="images.search"
         ></cover-image>
         <cover-view class="search-placeholder">搜索地点</cover-view>
     </cover-view>
 
     <!-- 地图组件 -->
     <map
+      id="map1"
       class="map"
       :latitude="mapState.center.latitude"
       :longitude="mapState.center.longitude"
@@ -38,14 +42,17 @@
     >
       <cover-image 
         class="btn-icon" 
-        src="/static/images/location.png"
+        :src="images.location"
       ></cover-image>
     </cover-view>
 
     <!-- 创建模式指示器 -->
     <cover-view v-if="isCreatingMode" class="creating-indicator">
-      <cover-view class="indicator-text">点击地图选择标记位置</cover-view>
-      <cover-view class="cancel-btn" @click="cancelCreating">取消</cover-view>
+      <cover-view class="indicator-text">移动或点击地图选择标记位置</cover-view>
+      <cover-view class="indicator-buttons">
+        <cover-view class="cancel-btn" @click="cancelCreating">取消</cover-view>
+        <cover-view class="confirm-btn" @click="confirmLocation">确定</cover-view>
+      </cover-view>
     </cover-view>
 
     <!-- 添加按钮 -->
@@ -56,7 +63,7 @@
     >
       <cover-image 
         class="btn-icon" 
-        src="/static/images/add.png"
+        :src="images.add"
       ></cover-image>
     </cover-view>
 
@@ -89,20 +96,39 @@
       <uni-popup-dialog
         type="warning"
         title="删除标记"
-        content="确定要删除这个标记吗？此操作不可撤销。"
+        content="确定删除这个标记吗？此操作不可撤销。"
         :duration="2000"
         :before-close="true"
         @confirm="confirmDelete"
         @close="cancelDelete"
       ></uni-popup-dialog>
     </uni-popup>
+
+    <!-- 添加中心标记 cover-view -->
+    <cover-view 
+      v-if="isCreatingMode" 
+      class="center-marker"
+    >
+      <cover-image 
+        class="marker-icon"
+        :src="images.marker"
+      ></cover-image>
+    </cover-view>
   </view>
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount,getCurrentInstance } from 'vue'
 import { useStore } from 'vuex'
 import MarkerEditContent from '@/components/marker-edit-content.vue'
+
+// 修改静态资源配置，添加 marker 图标
+const staticImages = {
+  search: '/static/images/search.png',
+  location: '/static/images/location.png',
+  add: '/static/images/add.png',
+  marker: '/static/images/marker.png' // 新增 marker 图标路径
+}
 
 export default {
   components: {
@@ -156,7 +182,7 @@ export default {
         latitude: marker.location.latitude,
         longitude: marker.location.longitude,
         title: marker.title,
-        iconPath: '/static/images/marker.png',
+        iconPath: staticImages.marker, // 使用变量替代硬编码路径
         width: 32,
         height: 32,
         callout: {
@@ -187,6 +213,9 @@ export default {
     // 移除原有的搜索相关状态和方法
     const isSearchPopupOpen = ref(false)
     const isSearchBoxHidden = ref(false)
+
+    // 添加地图上下文引用
+    const mapContext = ref(null)
 
     // 方法定义...
     const startCreating = () => {
@@ -446,12 +475,43 @@ export default {
     onMounted(() => {
       // 初始化时获取一次位置
       moveToCurrentLocation()
+      mapContext.value = uni.createMapContext("map1", getCurrentInstance().proxy)
     })
 
     // 移除定时器相关代码
     onBeforeUnmount(() => {
       // 清理代码...
     })
+
+    // 确认位置
+    const confirmLocation = async () => {
+      try {
+        const location = await new Promise((resolve, reject) => {
+          mapContext.value?.getCenterLocation({
+            success: res => resolve(res),
+            fail: err => reject(err)
+          })
+        })
+        
+        newMarker.value = {
+          title: '',
+          description: '',
+          location: {
+            latitude: location.latitude,
+            longitude: location.longitude
+          }
+        }
+        isCreatingMode.value = false
+        createPopup.value.open()
+        isCreatePopupOpen.value = true
+      } catch (error) {
+        console.error('获取中心位置失败:', error)
+        uni.showToast({
+          title: '获取位置失败',
+          icon: 'error'
+        })
+      }
+    }
 
     return {
       createPopup,
@@ -478,7 +538,9 @@ export default {
       openLocationChooser,
       isSearchPopupOpen,
       isSearchBoxHidden,
-      isAnyPopupOpen
+      isAnyPopupOpen,
+      images: staticImages,
+      confirmLocation
     }
   }
 }
@@ -509,23 +571,34 @@ export default {
   border-radius: 30px;
   padding: 12px 20px;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
   .indicator-text {
     color: #ffffff;
     font-size: 15px;
-    margin-right: 12px;
+    margin-bottom: 12px;
     font-weight: 500;
   }
 
-  .cancel-btn {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-    padding: 6px 12px;
-    border-radius: 15px;
-    font-size: 13px;
+  .indicator-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+
+    .cancel-btn,
+    .confirm-btn {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 6px 12px;
+      border-radius: 15px;
+      font-size: 13px;
+    }
+
+    .confirm-btn {
+      background-color: #007AFF;
+    }
   }
 }
 
@@ -643,11 +716,11 @@ export default {
 // 搜索框样式
 .search-container {
   position: fixed;
-  top: 0;
+  top: 44px;
   left: 0;
   right: 0;
   z-index: 100;
-  margin: 44px 100px 12px 16px;
+  margin: 0 100px 12px 16px;
   border-radius: 30px;
 
   background: linear-gradient(to bottom, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.8) 100%);
@@ -693,6 +766,33 @@ export default {
   
   &.uni-popup-dialog {
     z-index: 999 !important;
+  }
+}
+
+.status-bar-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 100%);
+  z-index: 99;
+  pointer-events: none;
+}
+
+// 修改中心标记样式
+.center-marker {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -100%);
+  width: 32px;
+  height: 32px;
+  z-index: 90;
+  
+  .marker-icon {
+    width: 100%;
+    height: 100%;
   }
 }
 
