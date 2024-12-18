@@ -68,7 +68,7 @@
     </cover-view>
 
     <!-- 创建标记弹窗 -->
-    <uni-popup ref="createPopup" type="bottom">
+    <uni-popup ref="createPopup" type="bottom" @maskClick="cancelCreate">
       <marker-edit-content
         v-model="newMarker"
         title="创建新标记"
@@ -79,7 +79,7 @@
     </uni-popup>
 
     <!-- 编辑标记弹窗 -->
-    <uni-popup ref="editPopup" type="bottom">
+    <uni-popup ref="editPopup" type="bottom" @maskClick="cancelEdit">
       <marker-edit-content
         v-model="editingMarker"
         title="编辑标记"
@@ -92,7 +92,7 @@
     </uni-popup>
 
     <!-- 删除确认弹窗 -->
-    <uni-popup ref="deleteConfirmPopup" type="dialog">
+    <uni-popup ref="deleteConfirmPopup" type="dialog" @maskClick="cancelDelete">
       <uni-popup-dialog
         type="warning"
         title="删除标记"
@@ -282,6 +282,15 @@ export default {
         return
       }
 
+      // 检查标题是否已存在
+      if (store.getters.isTitleExists(newMarker.value.title)) {
+        uni.showToast({
+          title: '标题已存在',
+          icon: 'none'
+        })
+        return
+      }
+
       try {
         await store.dispatch('createMarker', {
           ...newMarker.value,
@@ -381,6 +390,15 @@ export default {
       if (!editingMarker.value.title) {
         uni.showToast({
           title: '请输入标题',
+          icon: 'none'
+        })
+        return
+      }
+
+      // 检查标题是否已存在(排除当前编辑的标记)
+      if (store.getters.isTitleExists(editingMarker.value.title, editingMarker.value.id)) {
+        uni.showToast({
+          title: '标题已存在',
           icon: 'none'
         })
         return
@@ -780,7 +798,7 @@ export default {
   pointer-events: none;
 }
 
-// 修改中心标记样式
+// 添加中心标记样式
 .center-marker {
   position: fixed;
   left: 50%;

@@ -170,6 +170,11 @@ export default createStore({
   getters: {
     selectedMarker: (state) => {
       return state.markers.items.find(marker => marker.id === state.map.selectedMarkerId)
+    },
+    isTitleExists: (state) => (title, excludeId = null) => {
+      return state.markers.items.some(marker => 
+        marker.title === title && marker.id !== excludeId
+      )
     }
   }
 })

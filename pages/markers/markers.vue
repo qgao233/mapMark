@@ -85,7 +85,7 @@
         <view 
           v-if="!isManageMode"
           class="delete-btn"
-          @tap="deleteMarker"
+          @tap="deleteMarker(marker)"
         >删除</view>
       </view>
 
@@ -284,7 +284,18 @@ const touchEnd = (e) => {
 }
 
 // 删除标记
-const deleteMarker = () => {
+const deleteMarker = (marker) => {
+  if(marker){
+    editingMarker.value = {
+      id: marker.id,
+      title: marker.title,
+      description: marker.description,
+      location: marker.location,
+      tags: marker.tags || [],
+      createTime: marker.createTime,
+      updateTime: marker.updateTime
+    }
+  }
   markerToDelete.value = editingMarker.value
   deleteConfirmPopup.value.open()
 }
