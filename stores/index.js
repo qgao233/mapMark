@@ -1,4 +1,5 @@
 import { createStore } from 'vuex'
+import StorageMigrator from '@/utils/storage-migrator'
 
 export default createStore({
   state: {
@@ -68,50 +69,16 @@ export default createStore({
   actions: {
     async initializeMarkers({ commit }) {
       try {
-        const storage = await uni.getStorage({ key: 'markers' })
-        let markers = storage.data || []
-        
-        // 如果没有标记点，添加两个初始标记点
-        if (markers.length === 0) {
-          markers = [
-            {
-              id: 1,
-              title: '天安门',
-              description: '中华人民共和国的象征，世界上最大的城市广场',
-              location: {
-                latitude: 39.908823,
-                longitude: 116.397470
-              },
-              createTime: Date.now() - 86400000, // 24小时前
-              updateTime: Date.now() - 86400000
-            },
-            {
-              id: 2,
-              title: '故宫博物院',
-              description: '中国明清两代的皇家宫殿，世界上现存规模最大、保存最完整的木质结构古建筑之一',
-              location: {
-                latitude: 39.916345,
-                longitude: 116.397026
-              },
-              createTime: Date.now(),
-              updateTime: Date.now()
-            }
-          ]
-          
-          // 保存到本地存储
-          await uni.setStorage({
-            key: 'markers',
-            data: markers
-          })
-        }
+        // 执行数据迁移
+        const migratedData = await StorageMigrator.migrate()
         
         // 设置最大 ID
-        if (markers.length > 0) {
-          const maxId = Math.max(...markers.map(m => parseInt(m.id)))
+        if (migratedData.items.length > 0) {
+          const maxId = Math.max(...migratedData.items.map(m => parseInt(m.id)))
           commit('SET_LAST_ID', maxId)
         }
         
-        commit('SET_MARKERS', markers)
+        commit('SET_MARKERS', migratedData.items)
       } catch (error) {
         console.error('初始化标记失败:', error)
         commit('SET_MARKERS', [])
@@ -130,7 +97,13 @@ export default createStore({
         
         commit('ADD_MARKER', marker)
         commit('SET_LAST_ID', newId)
-        await syncToStorage(state.markers.items)
+        
+        // 保存时包含版本号
+        await syncToStorage({
+          version: StorageMigrator.LATEST_VERSION,
+          items: state.markers.items
+        })
+        
         return marker
       } catch (error) {
         console.error('创建标记失败:', error)
@@ -179,12 +152,15 @@ export default createStore({
   }
 })
 
-// 辅助函数：同步到本地存储
-async function syncToStorage(markers) {
+// 修改同步到存储的辅助函数
+async function syncToStorage(data) {
   try {
     await uni.setStorage({
       key: 'markers',
-      data: markers
+      data: {
+        version: StorageMigrator.LATEST_VERSION,
+        items: data.items
+      }
     })
   } catch (error) {
     console.error('同步到存储失败:', error)

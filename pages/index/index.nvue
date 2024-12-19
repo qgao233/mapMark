@@ -159,6 +159,7 @@ export default {
       title: '',
       description: '',
       location: null,
+      category: '',
       tags: [],
       createTime: 0,
       updateTime: 0
@@ -170,6 +171,7 @@ export default {
       title: '',
       description: '',
       location: null,
+      category: '',
       tags: [],
       createTime: 0,
       updateTime: 0
@@ -226,17 +228,25 @@ export default {
       isCreatingMode.value = false
     }
 
-    const onMapTap = (e) => {
+    const onMapTap = async (e) => {
       if (!isCreatingMode.value) return
       
+      // 获取最近的 POI
+      const nearestPOI = await getNearestPOI({
+        latitude: e.detail.latitude,
+        longitude: e.detail.longitude
+      })
+      
       newMarker.value = {
-        title: '',
-        description: '',
+        title: nearestPOI?.name || '',
+        description: nearestPOI?.address || '',
         location: {
           latitude: e.detail.latitude,
           longitude: e.detail.longitude
-        }
+        },
+        poi: nearestPOI // 保存完整的 POI 信息
       }
+      
       isCreatingMode.value = false
       createPopup.value.open()
       isCreatePopupOpen.value = true
@@ -256,6 +266,7 @@ export default {
         description: marker.description,
         location: marker.location,
         tags: marker.tags || [],
+        poi: marker.poi,
         createTime: marker.createTime,
         updateTime: marker.updateTime
       }
@@ -511,14 +522,22 @@ export default {
           })
         })
         
+        // 获取最近的 POI
+        const nearestPOI = await getNearestPOI({
+          latitude: location.latitude,
+          longitude: location.longitude
+        })
+        
         newMarker.value = {
-          title: '',
-          description: '',
+          title: nearestPOI?.name || '',
+          description: nearestPOI?.address || '',
           location: {
             latitude: location.latitude,
             longitude: location.longitude
-          }
+          },
+          poi: nearestPOI // 保存完整的 POI 信息
         }
+        
         isCreatingMode.value = false
         createPopup.value.open()
         isCreatePopupOpen.value = true
@@ -529,6 +548,92 @@ export default {
           icon: 'error'
         })
       }
+    }
+
+    /**
+     * 获取指定位置最近的 POI
+     * @param {Object} location 位置对象 {latitude: number, longitude: number}
+     * @returns {Promise<Object|null>} 返回最近的 POI 信息，如果没有找到则返回 null
+     */
+    const getNearestPOI = async (location) => {
+      try {
+        // 显示加载提示
+        uni.showLoading({
+          title: '获取位置信息...',
+          mask: true
+        })
+
+        // 先将地图中心移动到指定位置
+        store.commit('SET_MAP_CENTER', location)
+        
+        // 等待地图更新完成
+        await new Promise(resolve => setTimeout(resolve, 200))
+
+        // 调用 chooseLocation 获取周边 POI
+        const poi = await uni.chooseLocation({
+          latitude: location.latitude,
+          longitude: location.longitude
+        }).catch(err => {
+          console.log('���户取消选择或发生错误:', err)
+          return null
+        })
+
+        // 隐藏加载提示
+        uni.hideLoading()
+
+        if (!poi) {
+          return null
+        }
+
+        // 计算 POI 到指定位置的距离
+        const distance = calculateDistance(
+          location.latitude,
+          location.longitude,
+          poi.latitude,
+          poi.longitude
+        )
+
+        // 如果距离超过 200 米，认为不是最近的 POI
+        //if (distance > 200) {
+        //  return null
+        //}
+
+        return {
+          name: poi.name,
+          address: poi.address,
+          latitude: poi.latitude,
+          longitude: poi.longitude,
+          distance: distance
+        }
+      } catch (error) {
+        console.error('获取 POI 失败:', error)
+        uni.hideLoading()
+        uni.showToast({
+          title: '获取位置信息失败',
+          icon: 'none'
+        })
+        return null
+      }
+    }
+
+    /**
+     * 计算两个坐标点之间的距离（米）
+     * @param {number} lat1 第一个点的纬度
+     * @param {number} lon1 第一个点的经度
+     * @param {number} lat2 第二个点的纬度
+     * @param {number} lon2 第二个点的经度
+     * @returns {number} 距离（米）
+     */
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+      const R = 6371000 // 地球半径（米）
+      const dLat = (lat2 - lat1) * Math.PI / 180
+      const dLon = (lon2 - lon1) * Math.PI / 180
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+      return R * c
     }
 
     return {
@@ -558,7 +663,9 @@ export default {
       isSearchBoxHidden,
       isAnyPopupOpen,
       images: staticImages,
-      confirmLocation
+      confirmLocation,
+      getNearestPOI,
+      calculateDistance
     }
   }
 }
