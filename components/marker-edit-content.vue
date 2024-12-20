@@ -10,12 +10,16 @@
     <!-- 可滚动的内容区域 -->
     <scroll-view class="content-scroll" scroll-y :enable-flex="true">
       <view class="content-inner">
-        <input
-          v-model="markerData.title"
-          class="input"
-          placeholder="标记标题"
-          maxlength="50"
-        />
+        <!-- 标题输入 -->
+        <view class="select-container">
+          <text class="select-label">标题</text>
+          <input
+            v-model="markerData.title"
+            class="input"
+            placeholder="标记标题"
+            maxlength="50"
+          />
+        </view>
         
         <!-- 分类选择 -->
         <view class="select-container">
@@ -28,7 +32,15 @@
             class="picker"
           >
             <view class="picker-value">
-              <text>{{ markerData.category ? getCategoryLabel(markerData.category) : '请选择分类' }}</text>
+              <view class="picker-content">
+                <image 
+                  v-if="markerData.category" 
+                  :src="getCategoryByValue(markerData.category)?.iconPath" 
+                  class="picker-icon" 
+                  mode="aspectFit"
+                />
+                <text>{{ markerData.category ? getCategoryLabel(markerData.category) : '请选择分类' }}</text>
+              </view>
               <text class="picker-arrow">▼</text>
             </view>
           </picker>
@@ -50,21 +62,37 @@
           </view>
         </view>
         
-        <textarea
-          v-model="markerData.description"
-          class="textarea"
-          placeholder="详细描述"
-          maxlength="200"
-        />
+        <!-- 详细描述 -->
+        <view class="select-container">
+          <text class="select-label">详细描述</text>
+          <textarea
+            v-model="markerData.description"
+            class="textarea"
+            placeholder="详细描述"
+            maxlength="200"
+          />
+        </view>
         
+        <!-- POI 信息 -->
         <view v-if="markerData.poi" class="poi-info">
+          <text class="select-label">位置信息</text>
           <view class="poi-name">
             <text class="label">相对位置名称：</text>
-            <text class="value">{{ markerData.poi.name }}</text>
+            <view class="name-container">
+              <text class="value">{{ markerData.poi.name }}</text>
+              <view class="copy-btn" @tap="copyName">
+                <text class="copy-text">复制</text>
+              </view>
+            </view>
           </view>
           <view class="poi-address">
             <text class="label">相对详细地址：</text>
-            <text class="value">{{ markerData.poi.address }}</text>
+            <view class="address-container">
+              <text class="value">{{ markerData.poi.address }}</text>
+              <view class="copy-btn" @tap="copyAddress">
+                <text class="copy-text">复制</text>
+              </view>
+            </view>
           </view>
           <view class="poi-distance">
             <text class="label">相对距离：</text>
@@ -95,6 +123,7 @@ import {
   MARKER_TAGS,
   getCategoryByValue 
 } from '@/utils/constants'
+import Tools from '@/utils/Tools'
 
 const props = defineProps({
   modelValue: {
@@ -126,11 +155,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'delete'])
 
 // 内部数据,用于双向绑定
-const markerData = ref({
-  ...props.modelValue,
-  tags: props.modelValue.tags || []
-})
-
+const markerData = ref(Tools.deepClone(props.modelValue))
 // 分类选择器相关
 const categories = MARKER_CATEGORIES
 const categoryIndex = computed(() => {
@@ -161,10 +186,7 @@ const toggleTag = (tagValue) => {
 
 // 监听外部数据变化
 watch(() => props.modelValue, (newVal) => {
-  markerData.value = {
-    ...newVal,
-    tags: newVal.tags || []
-  }
+  markerData.value = Tools.deepClone(newVal)
 }, { deep: true })
 
 // 确认操作
@@ -196,6 +218,36 @@ const onCancel = () => {
 const onDelete = () => {
   emit('delete')
 }
+
+// 复制地址
+const copyAddress = () => {
+  if (markerData.value?.poi?.address) {
+    uni.setClipboardData({
+      data: markerData.value.poi.address,
+      success: () => {
+        uni.showToast({
+          title: '地址已复制',
+          icon: 'none'
+        })
+      }
+    })
+  }
+}
+
+// 复制位置名称
+const copyName = () => {
+  if (markerData.value?.poi?.name) {
+    uni.setClipboardData({
+      data: markerData.value.poi.name,
+      success: () => {
+        uni.showToast({
+          title: '名称已复制',
+          icon: 'none'
+        })
+      }
+    })
+  }
+}
 </script>
 
 <style lang="scss">
@@ -205,17 +257,18 @@ const onDelete = () => {
   border-top-right-radius: 20px;
   display: flex;
   flex-direction: column;
-  height: 85vh; // 设置弹窗整体高度
+  height: 80vh; // 设置弹窗整体高度
 
   // #ifdef MP-WEIXIN
-  padding-bottom: 34px; // 适配底部安全区域
+  padding: 24px 20px; // 适配底部安全区域
+  margin-bottom: -34px; // 不允许动
   // #endif
-
+  
   .header {
     flex-shrink: 0;
-    padding: 24px 20px 0;
+    // padding: 24px 20px 0;
   }
-
+  
   .content-scroll {
     flex: 1;
     height: 0; // 关键：让 scroll-view 正确计算高度
@@ -226,20 +279,20 @@ const onDelete = () => {
       flex-direction: column;
     }
   }
-
+  
   .footer {
     flex-shrink: 0;
-    padding: 12px 20px 24px;
+    // padding: 12px 20px 24px;
     border-top: 1px solid #f0f0f0;
     background-color: #ffffff;
   }
-
+  
   .title-container {
     display: flex;
     justify-content: center;
     align-items: center;
     position: relative;
-
+  
     .popup-title {
       font-size: 18px;
       font-weight: 600;
@@ -247,8 +300,9 @@ const onDelete = () => {
       text-align: center;
       line-height: 25px;
       padding: 0 12px;
+      margin-bottom: 24px;
     }
-
+  
     &::after {
       content: '';
       position: absolute;
@@ -260,7 +314,7 @@ const onDelete = () => {
       transform: scaleY(0.5);
     }
   }
-
+  
   .input,
   .textarea {
     width: 100%;
@@ -268,25 +322,26 @@ const onDelete = () => {
     border-color: #e5e5e5;
     border-radius: 8px;
     padding: 12px;
-    margin-bottom: 16px;
     font-size: 15px;
     background-color: #f8f8f8;
     box-sizing: border-box;
   }
-
+  
   .input {
     height: 44px;
   }
-
+  
   .textarea {
     height: 120px;
   }
-
+  
   .btn-group {
     display: flex;
+    flex-direction: row;
     justify-content: space-between;
+    margin-top: 8px;
     width: 100%;
-
+  
     .btn {
       flex: 1;
       text-align: center;
@@ -295,29 +350,30 @@ const onDelete = () => {
       border-radius: 8px;
       font-size: 16px;
       font-weight: 500;
-
+  
       &:first-child {
         margin-left: 0;
       }
-
+  
       &:last-child {
         margin-right: 0;
       }
-
+  
       &.cancel-text {
         color: #666666;
         background-color: #f5f5f5;
       }
-
+  
       &.confirm-text {
         background-color: #007AFF;
         color: #ffffff;
-
+  
         &.disabled {
           background-color: rgba(0, 122, 255, 0.5);
+          pointer-events: none;
         }
       }
-
+  
       &.delete-text {
         flex: 0.8;
         background-color: #ff3b30;
@@ -325,16 +381,19 @@ const onDelete = () => {
       }
     }
   }
-
+  
   /* POI 信息样式 */
   .poi-info {
     background-color: #f8f8f8;
     border-radius: 8px;
     padding: 12px;
-    margin-bottom: 16px;
     display: flex;
     flex-direction: column;
-
+  
+    .select-label {
+      margin-bottom: 12px;
+    }
+  
     .poi-name,
     .poi-address,
     .poi-distance {
@@ -342,56 +401,163 @@ const onDelete = () => {
       display: flex;
       flex-direction: row;
       align-items: center;
-
+  
       &:last-child {
         margin-bottom: 0;
       }
-
+  
       .label {
         color: #666;
         font-size: 14px;
         margin-right: 4px;
       }
-
+  
       .value {
         color: #333;
         font-size: 14px;
         font-weight: 500;
       }
     }
-
+  
     .poi-address {
-      .value {
-        word-break: break-all;
+      margin-bottom: 8px;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+  
+      &:last-child {
+        margin-bottom: 0;
+      }
+  
+      .label {
+        color: #666;
+        font-size: 14px;
+        margin-right: 4px;
+      }
+  
+      .address-container {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+  
+        .value {
+          flex: 1;
+          color: #333;
+          font-size: 14px;
+          font-weight: 500;
+          word-break: break-all;
+        }
+  
+        .copy-btn {
+          background: #f5f5f5;
+          padding: 4px 8px;
+          border-radius: 4px;
+          margin-top: -2px;
+  
+          .copy-text {
+            font-size: 12px;
+            color: #007AFF;
+          }
+  
+          &:active {
+            opacity: 0.8;
+          }
+        }
+      }
+    }
+  
+    .poi-name {
+      margin-bottom: 8px;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+  
+      &:last-child {
+        margin-bottom: 0;
+      }
+  
+      .label {
+        color: #666;
+        font-size: 14px;
+        margin-right: 4px;
+      }
+  
+      .name-container {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+  
+        .value {
+          flex: 1;
+          color: #333;
+          font-size: 14px;
+          font-weight: 500;
+          word-break: break-all;
+        }
+  
+        .copy-btn {
+          background: #f5f5f5;
+          padding: 4px 8px;
+          border-radius: 4px;
+          margin-top: -2px;
+  
+          .copy-text {
+            font-size: 12px;
+            color: #007AFF;
+          }
+  
+          &:active {
+            opacity: 0.8;
+          }
+        }
       }
     }
   }
-
+  
   /* 新增样式 */
   .select-container {
     margin-bottom: 16px;
     display: flex;
     flex-direction: column;
-    
+  
     .select-label {
       font-size: 14px;
       color: #666;
       margin-bottom: 8px;
       display: block;
     }
-    
+  
     .picker {
       background-color: #f8f8f8;
       border-radius: 8px;
       border: 1px solid #e5e5e5;
-      
+  
       .picker-value {
         padding: 12px;
         font-size: 15px;
         display: flex;
+        flex-direction: row;
         justify-content: space-between;
         align-items: center;
-        
+  
+        .picker-content {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+  
+          .picker-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+          }
+        }
+  
         .picker-arrow {
           font-size: 12px;
           color: #999;
@@ -399,12 +565,13 @@ const onDelete = () => {
       }
     }
   }
-
+  
   .tags-container {
     display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
     gap: 8px;
-    
+  
     .tag-item {
       display: flex;
       align-items: center;
@@ -412,29 +579,29 @@ const onDelete = () => {
       background-color: #f8f8f8;
       border-radius: 16px;
       border: 1px solid #e5e5e5;
-      
+  
       &.tag-selected {
-        background-color: #007AFF;
-        border-color: #007AFF;
-        
+        background-color: #E5F1FF;
+        border-color: #A8D1FF;
+  
         .tag-label {
-          color: #fff;
+          color: #007AFF;
         }
       }
-      
+  
       .tag-icon {
         width: 16px;
         height: 16px;
         margin-right: 4px;
       }
-      
+  
       .tag-label {
         font-size: 14px;
         color: #333;
       }
     }
   }
-
+  
   /* 修改确认按钮禁用状态 */
   .btn.confirm-text.disabled {
     background-color: rgba(0, 122, 255, 0.5);

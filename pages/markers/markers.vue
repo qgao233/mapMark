@@ -21,17 +21,24 @@
 
     <!-- 筛选排序栏 -->
     <view class="filter-bar">
-      <view class="left-section">
-        <view 
-          class="sort-btn"
-          @tap="toggleSortOrder"
-        >
+      <view class="filter-section">
+        <view class="filter-btn" @tap="showCategoryFilter">
+          <text>{{ selectedCategories.length ? `已选${selectedCategories.length}个` : '全部分类' }}</text>
+          <text class="icon">▼</text>
+        </view>
+        <view class="filter-btn" @tap="showTagFilter">
+          <text>{{ selectedTags.length ? `已选${selectedTags.length}个` : '标签' }}</text>
+          <text class="icon">▼</text>
+        </view>
+      </view>
+      <view class="sort-section">
+        <view class="sort-btn" @tap="toggleSortOrder">
           {{ sortText }}
           <text class="icon" :class="{ 'icon-reverse': store.state.ui.sortOrder === 'asc' }">▼</text>
         </view>
         <text class="total-count">共 {{ displayMarkers.length }} 个标记</text>
+        <text class="manage-btn" @tap="toggleManageMode">{{ isManageMode ? '完成' : '管理' }}</text>
       </view>
-      <text class="manage-btn" @tap="toggleManageMode">{{ isManageMode ? '完成' : '管理' }}</text>
     </view>
 
     <!-- 标记点列表 -->
@@ -68,16 +75,29 @@
           </view>
 
           <view class="marker-content">
-            <view class="marker-title">{{ marker.title }}</view>
+            <view class="marker-title-row">
+              <image 
+                :src="getCategoryByValue(marker.category)?.iconPath" 
+                class="category-icon" 
+                mode="aspectFit"
+              />
+              <text class="title-text">{{ marker.title }}</text>
+            </view>
             <view class="marker-desc">{{ marker.description }}</view>
             <view class="marker-meta">
               <text class="marker-time">{{ formatTime(marker.createTime) }}</text>
               <view class="marker-tags" v-if="marker.tags?.length">
-                <text 
-                  v-for="tag in marker.tags" 
-                  :key="tag"
+                <view 
+                  v-for="tagValue in marker.tags" 
+                  :key="tagValue"
                   class="tag"
-                >{{ tag }}</text>
+                >
+                  <image 
+                    :src="getTagByValue(tagValue)?.iconPath" 
+                    class="tag-icon" 
+                    mode="aspectFit"
+                  />
+                </view>
               </view>
             </view>
           </view>
@@ -139,6 +159,58 @@
         @close="cancelDelete"
       ></uni-popup-dialog>
     </uni-popup>
+
+    <!-- 分类筛选弹窗 -->
+    <uni-popup ref="categoryPopup" type="bottom">
+      <view class="filter-popup">
+        <view class="filter-header">
+          <text class="filter-title">选择分类</text>
+          <text class="clear-btn" @tap="clearCategories">清除</text>
+        </view>
+        <scroll-view scroll-y class="filter-content">
+          <view 
+            v-for="category in MARKER_CATEGORIES"
+            :key="category.value"
+            class="filter-item"
+            @tap="toggleCategory(category.value)"
+          >
+            <view class="item-content">
+              <image :src="category.iconPath" class="item-icon" mode="aspectFit"/>
+              <text :class="['item-text', selectedCategories.includes(category.value) && 'selected']">
+                {{ category.label }}
+              </text>
+            </view>
+            <text v-if="selectedCategories.includes(category.value)" class="check-icon">✓</text>
+          </view>
+        </scroll-view>
+      </view>
+    </uni-popup>
+
+    <!-- 标签筛选弹窗 -->
+    <uni-popup ref="tagPopup" type="bottom">
+      <view class="filter-popup">
+        <view class="filter-header">
+          <text class="filter-title">选择标签</text>
+          <text class="clear-btn" @tap="clearTags">清除</text>
+        </view>
+        <scroll-view scroll-y class="filter-content">
+          <view 
+            v-for="tag in MARKER_TAGS"
+            :key="tag.value"
+            class="filter-item"
+            @tap="toggleTag(tag.value)"
+          >
+            <view class="item-content">
+              <image :src="tag.iconPath" class="item-icon" mode="aspectFit"/>
+              <text :class="['item-text', selectedTags.includes(tag.value) && 'selected']">
+                {{ tag.label }}
+              </text>
+            </view>
+            <text v-if="selectedTags.includes(tag.value)" class="check-icon">✓</text>
+          </view>
+        </scroll-view>
+      </view>
+    </uni-popup>
   </view>
 </template>
 
@@ -146,6 +218,7 @@
 import { ref, computed } from 'vue'
 import { useStore } from 'vuex'
 import MarkerEditContent from '@/components/marker-edit-content.vue'
+import { getCategoryByValue, getTagByValue, MARKER_CATEGORIES, MARKER_TAGS } from '@/utils/constants'
 
 const store = useStore()
 const deleteConfirmPopup = ref(null)
@@ -159,6 +232,12 @@ const sortText = computed(() => {
   return `创建时间 ${store.state.ui.sortOrder === 'desc' ? '新→旧' : '旧→新'}`
 })
 
+// 筛选状态
+const selectedCategories = ref([])
+const selectedTags = ref([])
+const categoryPopup = ref(null)
+const tagPopup = ref(null)
+
 // 处理后的标记点列表
 const displayMarkers = computed(() => {
   let markers = [...store.state.markers.items]
@@ -168,6 +247,18 @@ const displayMarkers = computed(() => {
     markers = markers.filter(marker => 
       marker.title.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
       marker.description.toLowerCase().includes(searchKeyword.value.toLowerCase())
+    )
+  }
+  
+  // 分类筛选
+  if (selectedCategories.value.length) {
+    markers = markers.filter(marker => selectedCategories.value.includes(marker.category))
+  }
+  
+  // 标签筛选
+  if (selectedTags.value.length) {
+    markers = markers.filter(marker => 
+      selectedTags.value.every(tag => marker.tags.includes(tag))
     )
   }
   
@@ -196,15 +287,7 @@ const toggleSortOrder = () => {
 
 // 显示标记详情
 const showMarkerDetail = (marker) => {
-  editingMarker.value = {
-    id: marker.id,
-    title: marker.title,
-    description: marker.description,
-    location: marker.location,
-    tags: marker.tags || [],
-    createTime: marker.createTime,
-    updateTime: marker.updateTime
-  }
+  editingMarker.value = marker
   editPopup.value.open()
 }
 
@@ -273,7 +356,7 @@ const touchEnd = (e) => {
   const marker = displayMarkers.value.find(m => m.id === currentMarkerId.value)
   if (!marker) return
   
-  // 根据偏移量决定是否显示删除按钮
+  // 根据偏移决定是否显示删除按钮
   if (marker.offset < -deleteButtonWidth / 2) {
     marker.offset = -deleteButtonWidth
   } else {
@@ -286,15 +369,7 @@ const touchEnd = (e) => {
 // 删除标记
 const deleteMarker = (marker) => {
   if(marker){
-    editingMarker.value = {
-      id: marker.id,
-      title: marker.title,
-      description: marker.description,
-      location: marker.location,
-      tags: marker.tags || [],
-      createTime: marker.createTime,
-      updateTime: marker.updateTime
-    }
+    editingMarker.value = marker
   }
   markerToDelete.value = editingMarker.value
   deleteConfirmPopup.value.open()
@@ -389,6 +464,8 @@ const editingMarker = ref({
   description: '',
   location: null,
   tags: [],
+  poi: null,
+  category: '',
   createTime: 0,
   updateTime: 0
 })
@@ -424,6 +501,8 @@ const cancelEdit = () => {
     description: '',
     location: null,
     tags: [],
+    poi: null,
+    category: '',
     createTime: 0,
     updateTime: 0
   }
@@ -432,6 +511,43 @@ const cancelEdit = () => {
 // 添加静态资源路径配置
 const staticImages = {
   search: '/static/images/search.png'
+}
+
+// 修改筛选方法
+const showCategoryFilter = () => {
+  categoryPopup.value.open()
+}
+
+const showTagFilter = () => {
+  tagPopup.value.open()
+}
+
+const toggleCategory = (value) => {
+  const index = selectedCategories.value.indexOf(value)
+  if (index === -1) {
+    selectedCategories.value.push(value)
+  } else {
+    selectedCategories.value.splice(index, 1)
+  }
+}
+
+const clearCategories = () => {
+  selectedCategories.value = []
+  categoryPopup.value.close()
+}
+
+const toggleTag = (value) => {
+  const index = selectedTags.value.indexOf(value)
+  if (index === -1) {
+    selectedTags.value.push(value)
+  } else {
+    selectedTags.value.splice(index, 1)
+  }
+}
+
+const clearTags = () => {
+  selectedTags.value = []
+  tagPopup.value.close()
 }
 </script>
 
@@ -469,28 +585,56 @@ const staticImages = {
 }
 
 .filter-bar {
-  display: flex;
-  padding: 12px 16px;
+  padding: 8px 16px;
   background: #fff;
-  justify-content: space-between;
-  align-items: center;
   border-bottom: 1px solid #f0f0f0;
-
-  .left-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  
+  .filter-section {
     display: flex;
-    align-items: center;
     gap: 12px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+
+    .filter-btn {
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      color: #333;
+      background: #f8f8f8;
+      padding: 6px 12px;
+      border-radius: 4px;
+      flex: 1;
+      min-width: 120px;
+      justify-content: space-between;
+      
+      .icon {
+        font-size: 12px;
+        color: #999;
+      }
+    }
+  }
+
+  .sort-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
 
     .sort-btn {
       display: flex;
       align-items: center;
       font-size: 14px;
       color: #333;
+      padding: 4px 0;
 
       .icon {
         margin-left: 4px;
         font-size: 12px;
         transition: transform 0.3s;
+        color: #999;
 
         &.icon-reverse {
           transform: rotate(180deg);
@@ -502,20 +646,21 @@ const staticImages = {
       font-size: 13px;
       color: #999;
     }
+
+    .manage-btn {
+      color: #007AFF;
+      font-size: 14px;
+      padding: 6px 12px;
+    }
   }
 
-  .manage-btn {
-    color: #007AFF;
-    font-size: 14px;
-    padding: 6px 12px;
-  }
+  
 }
 
 .markers-list {
-  //height: calc(100vh - 110px);
-  height: 0;
-  flex:1;
-  padding: 8px 0;
+  height: calc(100vh - 180px);
+  flex: 1;
+  padding: 12px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -583,11 +728,23 @@ const staticImages = {
         flex: 1;
         padding: 16px 16px 16px 8px;
 
-        .marker-title {
-          font-size: 16px;
-          font-weight: 500;
-          color: #333;
+        .marker-title-row {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
           margin-bottom: 6px;
+          
+          .category-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+          }
+          
+          .title-text {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+          }
         }
 
         .marker-desc {
@@ -615,11 +772,22 @@ const staticImages = {
             gap: 6px;
 
             .tag {
-              background: #f5f5f5;
-              color: #666;
-              padding: 2px 8px;
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              background: #f8f8f8;
+              padding: 4px 8px;
               border-radius: 4px;
-              font-size: 12px;
+              
+              .tag-icon {
+                width: 12px;
+                height: 12px;
+              }
+              
+              .tag-text {
+                font-size: 12px;
+                color: #666;
+              }
             }
           }
         }
@@ -729,5 +897,76 @@ const staticImages = {
   background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, #fff 100%);
   z-index: 99;
   pointer-events: none;
+}
+
+.filter-popup {
+  background-color: #fff;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+// #ifdef MP-WEIXIN
+  margin-bottom: -34px; // 不允许动
+  // #endif
+  .filter-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .filter-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: #333;
+    }
+
+    .clear-btn {
+      font-size: 14px;
+      color: #007AFF;
+    }
+  }
+
+  .filter-content {
+    padding: 8px 0;
+    max-height: calc(70vh - 53px);
+
+    .filter-item {
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      &:active {
+        background-color: #f8f8f8;
+      }
+
+      .item-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .item-icon {
+          width: 20px;
+          height: 20px;
+        }
+      }
+
+      .item-text {
+        font-size: 15px;
+        color: #333;
+
+        &.selected {
+          color: #007AFF;
+        }
+      }
+
+      .check-icon {
+        color: #007AFF;
+        font-size: 16px;
+      }
+    }
+  }
 }
 </style> 

@@ -36,8 +36,8 @@ export const MARKER_CATEGORIES = [
   },
   {
     label: '其他',
-    value: 'other',
-    iconPath: '/static/images/markers/other.png'
+    value: 'marker',
+    iconPath: '/static/images/markers/marker.png'
   }
 ]
 

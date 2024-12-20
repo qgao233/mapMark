@@ -99,10 +99,7 @@ export default createStore({
         commit('SET_LAST_ID', newId)
         
         // 保存时包含版本号
-        await syncToStorage({
-          version: StorageMigrator.LATEST_VERSION,
-          items: state.markers.items
-        })
+        await syncToStorage(state.markers)
         
         return marker
       } catch (error) {
@@ -118,7 +115,8 @@ export default createStore({
         )
         commit('SET_MARKERS', markers)
         // 保存到本地存储
-        await uni.setStorageSync('markers', markers)
+        // 保存时包含版本号
+        await syncToStorage(state.markers)
         return true
       } catch (error) {
         console.error('更新标记失败:', error)
@@ -131,7 +129,8 @@ export default createStore({
         const markers = state.markers.items.filter(marker => marker.id !== markerId)
         commit('SET_MARKERS', markers)
         // 保存到本地存储
-        await uni.setStorageSync('markers', markers)
+        // 保存时包含版本号
+        await syncToStorage(state.markers)
         return true
       } catch (error) {
         console.error('删除标记失败:', error)

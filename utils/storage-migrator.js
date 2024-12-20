@@ -23,6 +23,7 @@ class StorageMigrator {
 
       // 获取当前数据版本
       const currentVersion = currentData.version || 1
+    //   const currentVersion = 1
 
       // 如果已经是最新版本，直接返回
       if (currentVersion >= this.LATEST_VERSION) {
@@ -31,7 +32,6 @@ class StorageMigrator {
 
       // 按版本号顺序执行迁移
       let migratedData = currentData
-        console.log('迁移到版本2',migratedData)
 
       for (let v = currentVersion; v < this.LATEST_VERSION; v++) {
         migratedData = await this[`_migrateToV${v + 1}`](migratedData)
@@ -97,6 +97,8 @@ class StorageMigrator {
       version: 2,
       items: oldData.map(item => ({
         ...item,
+        category: item.category || 'marker',
+        tags: item.tags || [],
         poi: item.poi || {
             name: item.title,
             address: item.description,
@@ -104,7 +106,6 @@ class StorageMigrator {
             longitude: item.location.longitude,
             distance: 0
         },
-        // tags: item.tags || [] // 添加 tags 字段
       }))
     }
     return newData
