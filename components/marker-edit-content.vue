@@ -5,12 +5,34 @@
       <view class="title-container">
         <text class="popup-title">{{ title }}</text>
       </view>
+      <view class="options-btn" @tap="showPopup">
+        <view class="dots">
+          <view class="dot"></view>
+          <view class="dot"></view>
+          <view class="dot"></view>
+        </view>
+      </view>
     </view>
+    
+    <!-- 选项菜单弹窗 -->
+    <uni-popup ref="popup" type="bottom">
+      <view class="popup-menu">
+        <view class="menu-item" @tap="handleView">
+          <text class="menu-text">查看</text>
+        </view>
+        <view class="menu-item" @tap="handleShare">
+          <text class="menu-text">分享</text>
+        </view>
+        <view class="menu-item cancel" @tap="hidePopup">
+          <text class="menu-text">取消</text>
+        </view>
+      </view>
+    </uni-popup>
     
     <!-- 可滚动的内容区域 -->
     <scroll-view class="content-scroll" scroll-y :enable-flex="true">
       <view class="content-inner">
-        <!-- 标题输入 -->
+        <!-- 标题输�� -->
         <view class="select-container">
           <text class="select-label">标题</text>
           <input
@@ -126,6 +148,7 @@ import {
   getCategoryByValue 
 } from '@/utils/constants'
 import Tools from '@/utils/Tools'
+import store from '@/stores'
 
 const props = defineProps({
   modelValue: {
@@ -250,6 +273,43 @@ const copyName = () => {
     })
   }
 }
+
+const popup = ref(null)
+
+const showPopup = () => {
+  popup.value.open()
+}
+
+const hidePopup = () => {
+  popup.value.close()
+}
+
+// 处理查看操作
+const handleView = () => {
+  if (markerData.value?.location) {
+    // 更新地图中心点并跳转
+    const { latitude, longitude } = markerData.value.location
+    store.commit('SET_MAP_CENTER', { latitude, longitude })
+    uni.switchTab({
+      url: '/pages/index/index'
+    })
+    hidePopup()
+  } else {
+    uni.showToast({
+      title: '无法获取位置信息',
+      icon: 'none'
+    })
+  }
+}
+
+// 处理分享操作（预留）
+const handleShare = () => {
+  uni.showToast({
+    title: '分享功能开发中',
+    icon: 'none'
+  })
+  hidePopup()
+}
 </script>
 
 <style lang="scss">
@@ -269,6 +329,30 @@ const copyName = () => {
   .header {
     flex-shrink: 0;
     // padding: 24px 20px 0;
+    position: relative;
+    
+    .options-btn {
+      position: absolute;
+      right: 0;
+      top: 0;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      .dots {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        
+        .dot {
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background-color: #666;
+        }
+      }
+    }
   }
   
   .content-scroll {
@@ -601,6 +685,55 @@ const copyName = () => {
   .btn.confirm-text.disabled {
     background-color: rgba(0, 122, 255, 0.5);
     pointer-events: none;
+  }
+
+  /* 选项菜单样式 */
+  .popup-menu {
+    background-color: #ffffff;
+    border-radius: 12px 12px 0 0;
+    overflow: hidden;
+    // #ifdef MP-WEIXIN
+  margin-bottom: -34px; // 不允许动
+  // #endif
+    .menu-item {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      
+      &:active {
+        background-color: #f5f5f5;
+      }
+      
+      &:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1px;
+        background-color: #eee;
+        transform: scaleY(0.5);
+      }
+      
+      .menu-text {
+        font-size: 16px;
+        color: #333;
+        
+        &.cancel {
+          color: #999;
+        }
+      }
+    }
+    
+    .cancel {
+      margin-top: 8px;
+      
+      .menu-text {
+        color: #999;
+      }
+    }
   }
 }
 </style> 
