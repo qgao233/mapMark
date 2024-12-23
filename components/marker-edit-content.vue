@@ -74,29 +74,31 @@
         </view>
         
         <!-- POI 信息 -->
-        <view v-if="markerData.poi" class="poi-info">
+        <view v-if="markerData.poi" class="select-container">
           <text class="select-label">位置信息</text>
-          <view class="poi-name">
-            <text class="label">相对位置名称：</text>
-            <view class="name-container">
-              <text class="value">{{ markerData.poi.name }}</text>
-              <view class="copy-btn" @tap="copyName">
-                <text class="copy-text">复制</text>
+          <view class="poi-container">
+            <view class="poi-name">
+              <text class="label">相对位置名称：</text>
+              <view class="name-container">
+                <text class="value">{{ markerData.poi.name }}</text>
+                <view class="copy-btn" @tap="copyName">
+                  <text class="copy-text">复制</text>
+                </view>
               </view>
             </view>
-          </view>
-          <view class="poi-address">
-            <text class="label">相对详细地址：</text>
-            <view class="address-container">
-              <text class="value">{{ markerData.poi.address }}</text>
-              <view class="copy-btn" @tap="copyAddress">
-                <text class="copy-text">复制</text>
+            <view class="poi-address">
+              <text class="label">相对详细地址：</text>
+              <view class="address-container">
+                <text class="value">{{ markerData.poi.address }}</text>
+                <view class="copy-btn" @tap="copyAddress">
+                  <text class="copy-text">复制</text>
+                </view>
               </view>
             </view>
-          </view>
-          <view class="poi-distance">
-            <text class="label">相对距离：</text>
-            <text class="value">{{ Math.round(markerData.poi.distance) }}米</text>
+            <view class="poi-distance">
+              <text class="label">相对距离：</text>
+              <text class="value">{{ Math.round(markerData.poi.distance) }}米</text>
+            </view>
           </view>
         </view>
       </view>
@@ -316,7 +318,8 @@ const copyName = () => {
   }
   
   .input,
-  .textarea {
+  .textarea,
+  .poi-container {
     width: 100%;
     border-width: 1px;
     border-color: #e5e5e5;
@@ -382,18 +385,56 @@ const copyName = () => {
     }
   }
   
-  /* POI 信息样式 */
-  .poi-info {
-    background-color: #f8f8f8;
-    border-radius: 8px;
-    padding: 12px;
+  
+  /* 新增样式 */
+  .select-container {
+    margin-bottom: 16px;
     display: flex;
     flex-direction: column;
   
     .select-label {
-      margin-bottom: 12px;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+      display: block;
     }
+
+    
   
+    .picker {
+      background-color: #f8f8f8;
+      border-radius: 8px;
+      border: 1px solid #e5e5e5;
+  
+      .picker-value {
+        padding: 12px;
+        font-size: 15px;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+  
+        .picker-content {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+  
+          .picker-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+          }
+        }
+  
+        .picker-arrow {
+          font-size: 12px;
+          color: #999;
+        }
+      }
+    }
+  }
+
+  .poi-container{
     .poi-name,
     .poi-address,
     .poi-distance {
@@ -515,52 +556,6 @@ const copyName = () => {
           &:active {
             opacity: 0.8;
           }
-        }
-      }
-    }
-  }
-  
-  /* 新增样式 */
-  .select-container {
-    margin-bottom: 16px;
-    display: flex;
-    flex-direction: column;
-  
-    .select-label {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 8px;
-      display: block;
-    }
-  
-    .picker {
-      background-color: #f8f8f8;
-      border-radius: 8px;
-      border: 1px solid #e5e5e5;
-  
-      .picker-value {
-        padding: 12px;
-        font-size: 15px;
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-  
-        .picker-content {
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-  
-          .picker-icon {
-            width: 16px;
-            height: 16px;
-            margin-right: 8px;
-          }
-        }
-  
-        .picker-arrow {
-          font-size: 12px;
-          color: #999;
         }
       }
     }
